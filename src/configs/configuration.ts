@@ -1,7 +1,6 @@
 import { Logger } from '@nestjs/common';
 
 export const REQUIRED_ENVS = [
-  'DATABASE_TYPE',
   'DATABASE_HOST',
   'DATABASE_PORT',
   'DATABASE_USERNAME',
