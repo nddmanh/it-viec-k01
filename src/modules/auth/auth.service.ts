@@ -7,6 +7,8 @@ import { ApplicantRepository } from 'src/databases/repositories/applicant.reposi
 import { LoginDto } from './dtos/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { RefreshTokenDto } from './dtos/refresh-token.dto';
+import { User } from 'src/databases/entities/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -69,11 +71,62 @@ export class AuthService {
       );
     }
 
-    const payload = {
-      id: userRecord.id,
-      username: userRecord.username,
-      loginType: userRecord.loginType,
-      role: userRecord.role,
+    const payload = this.getPayload(userRecord);
+    const { accessToken, refreshToken } = await this.signTokens(payload);
+
+    return {
+      message: 'Login user successfully',
+      result: {
+        accessToken,
+        refreshToken,
+      },
+    };
+  }
+
+  async refresh(body: RefreshTokenDto) {
+    const { refreshToken } = body;
+
+    //verify xem rt có hợp lệ k
+    const payloadRefreshToken = await this.jwtService.verifyAsync(
+      refreshToken,
+      {
+        secret: this.configService.get('jwtAuth').jwtRefreshTokenSecret,
+      },
+    );
+
+    const userRecord = await this.userRepository.findOneBy({
+      id: payloadRefreshToken.id,
+    });
+    if (!userRecord) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    // gen ra cặp token mới
+    const payload = this.getPayload(userRecord);
+    const { accessToken, refreshToken: newRefresshToken } =
+      await this.signTokens(payload);
+
+    return {
+      message: 'Refresh token successfully',
+      result: {
+        accessToken,
+        refreshToken: newRefresshToken,
+      },
+    };
+  }
+
+  getPayload(user: User) {
+    return {
+      id: user.id,
+      username: user.username,
+      loginType: user.loginType,
+      role: user.role,
+    };
+  }
+
+  async signTokens(payload) {
+    const payloadRefreshToken = {
+      id: payload.id,
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
@@ -81,11 +134,14 @@ export class AuthService {
       expiresIn: '15m',
     });
 
+    const refreshToken = await this.jwtService.signAsync(payloadRefreshToken, {
+      secret: this.configService.get('jwtAuth').jwtRefreshTokenSecret,
+      expiresIn: '7d',
+    });
+
     return {
-      message: 'Login user successfully',
-      result: {
-        accessToken,
-      },
+      accessToken,
+      refreshToken,
     };
   }
 }
