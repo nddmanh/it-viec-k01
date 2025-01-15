@@ -4,6 +4,7 @@ import { RegisterUserDto } from './dtos/register-user.dto';
 import { LoginDto } from './dtos/login.dto';
 import { RefreshTokenDto } from './dtos/refresh-token.dto';
 import { Public } from 'src/commons/decorators/public.decorator';
+import { LoginGoogleDto } from './dtos/login-google.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -32,5 +33,11 @@ export class AuthController {
   @Post('refresh')
   refresh(@Body() body: RefreshTokenDto) {
     return this.authService.refresh(body);
+  }
+
+  @Public()
+  @Post('login-google')
+  loginGoogle(@Body() body: LoginGoogleDto) {
+    return this.authService.loginGoogle(body);
   }
 }
