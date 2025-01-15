@@ -19,6 +19,10 @@ export default () => ({
     url: process.env.SUPABASE_URL || '',
     bucket: process.env.SUPABASE_PRIVATE_BUCKET || '',
   },
+  google: {
+    clientId: process.env.GG_CLIENT_ID || '',
+    clientSecret: process.env.GG_CLIENT_SECRET || '',
+  },
 });
 
 export const validateEnvironments = (): void => {

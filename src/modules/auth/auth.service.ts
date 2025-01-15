@@ -9,6 +9,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RefreshTokenDto } from './dtos/refresh-token.dto';
 import { User } from 'src/databases/entities/user.entity';
+import { LoginGoogleDto } from './dtos/login-google.dto';
+import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
@@ -142,6 +144,65 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+    };
+  }
+
+  async loginGoogle(body: LoginGoogleDto) {
+    const { token } = body;
+
+    const ggClientId = this.configService.get('google').clientId;
+    const ggSecret = this.configService.get('google').clientSecret;
+
+    const oAuth2Client = new OAuth2Client(ggClientId, ggSecret);
+    const ggLoginTicket = await oAuth2Client.verifyIdToken({
+      idToken: token,
+      audience: ggClientId,
+    });
+
+    const { email_verified, email, name } = ggLoginTicket.getPayload();
+    if (!email_verified) {
+      throw new HttpException(
+        'Email is not verified!: ' + email,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // check user exist
+    let userRecord = await this.userRepository.findOneBy({
+      email: email,
+      // loginType: LOGIN_TYPE.GOOGLE,
+    });
+
+    // check xem email này đã được dùng để đăng ký user chưa
+    if (userRecord && userRecord.loginType === LOGIN_TYPE.EMAIL) {
+      throw new HttpException(
+        'Email use to register with email: ' + email,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // Nếu không tồn tại thì tại user login with gg mới
+    if (!userRecord) {
+      userRecord = await this.userRepository.save({
+        email,
+        username: name,
+        loginType: LOGIN_TYPE.GOOGLE,
+      });
+
+      await this.applicantRepository.save({
+        userId: userRecord.id,
+      });
+    }
+
+    const payload = this.getPayload(userRecord);
+    const { accessToken, refreshToken } = await this.signTokens(payload);
+
+    return {
+      message: 'Login with gg successfully',
+      result: {
+        accessToken,
+        refreshToken,
+      },
     };
   }
 }
