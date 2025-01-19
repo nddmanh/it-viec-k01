@@ -11,6 +11,10 @@ import { RefreshTokenDto } from './dtos/refresh-token.dto';
 import { User } from 'src/databases/entities/user.entity';
 import { LoginGoogleDto } from './dtos/login-google.dto';
 import { OAuth2Client } from 'google-auth-library';
+import { RegisterCompanyDto } from './dtos/register-company.dto';
+import { CompanyRepository } from 'src/databases/repositories/company.repository';
+import { DataSource } from 'typeorm';
+import { Company } from 'src/databases/entities/company.entity';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +23,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly userRepository: UserRepository,
     private readonly applicantRepository: ApplicantRepository,
+    private readonly companyRepository: CompanyRepository,
+    private readonly dataSource: DataSource,
   ) {}
 
   async registerUser(body: RegisterUserDto) {
@@ -50,6 +56,60 @@ export class AuthService {
     return {
       message: 'Register user successfully',
     };
+  }
+
+  async registerCompany(body: RegisterCompanyDto) {
+    const {
+      username,
+      email,
+      password,
+      companyName,
+      companyAddress,
+      companyWebsite,
+    } = body;
+
+    // check email exist
+    const userRecord = await this.userRepository.findOneBy({ email: email });
+    if (userRecord) {
+      throw new HttpException('Email is exist', HttpStatus.BAD_REQUEST);
+    }
+
+    // Hash password
+    const hashPassword = await argon2.hash(password);
+
+    const queryRunnner = this.dataSource.createQueryRunner();
+    await queryRunnner.connect();
+
+    await queryRunnner.startTransaction();
+    try {
+      // Create new user
+      const newUser = await queryRunnner.manager.save(User, {
+        email,
+        username,
+        password: hashPassword,
+        loginType: LOGIN_TYPE.EMAIL,
+        role: ROLE.COMPANY,
+      });
+
+      // Create new company by user
+      await queryRunnner.manager.save(Company, {
+        userId: newUser.id,
+        name: companyName,
+        location: companyAddress,
+        website: companyWebsite,
+      });
+
+      await queryRunnner.commitTransaction();
+
+      return {
+        message: 'Register user company successfully',
+      };
+    } catch (error) {
+      console.log(error);
+      await queryRunnner.rollbackTransaction();
+    } finally {
+      await queryRunnner.release();
+    }
   }
 
   async login(body: LoginDto) {
