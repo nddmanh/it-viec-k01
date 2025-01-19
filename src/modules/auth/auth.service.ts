@@ -15,6 +15,7 @@ import { RegisterCompanyDto } from './dtos/register-company.dto';
 import { CompanyRepository } from 'src/databases/repositories/company.repository';
 import { DataSource } from 'typeorm';
 import { Company } from 'src/databases/entities/company.entity';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -25,6 +26,7 @@ export class AuthService {
     private readonly applicantRepository: ApplicantRepository,
     private readonly companyRepository: CompanyRepository,
     private readonly dataSource: DataSource,
+    private readonly mailService: MailService,
   ) {}
 
   async registerUser(body: RegisterUserDto) {
@@ -52,6 +54,17 @@ export class AuthService {
     await this.applicantRepository.save({
       userId: newUser.id,
     });
+
+    // Send mail here
+    await this.mailService.sendMail(
+      email,
+      'Welcome to IT VIEC',
+      'welcome-applicant',
+      {
+        name: username,
+        email: email,
+      },
+    );
 
     return {
       message: 'Register user successfully',
@@ -101,6 +114,17 @@ export class AuthService {
 
       await queryRunnner.commitTransaction();
 
+      // Send mail here
+      await this.mailService.sendMail(
+        email,
+        'Welcome your company to IT VIEC',
+        'welcome-company',
+        {
+          name: username,
+          email: email,
+          company: companyName,
+        },
+      );
       return {
         message: 'Register user company successfully',
       };
