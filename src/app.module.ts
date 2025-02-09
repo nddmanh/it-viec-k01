@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './modules/auth/auth.guard';
+import { StorageModule } from './modules/storage/storage.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AuthGuard } from './modules/auth/auth.guard';
       }),
     }),
     AuthModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [
