@@ -11,6 +11,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './modules/auth/auth.guard';
 import { StorageModule } from './modules/storage/storage.module';
+import { SkillModule } from './modules/skill/skill.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { StorageModule } from './modules/storage/storage.module';
     }),
     AuthModule,
     StorageModule,
+    SkillModule,
   ],
   controllers: [AppController],
   providers: [
