@@ -13,6 +13,7 @@ import { AuthGuard } from './modules/auth/auth.guard';
 import { StorageModule } from './modules/storage/storage.module';
 import { SkillModule } from './modules/skill/skill.module';
 import { IndustryModule } from './modules/industry/industry.module';
+import { CompanyModule } from './modules/company/company.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { IndustryModule } from './modules/industry/industry.module';
     StorageModule,
     SkillModule,
     IndustryModule,
+    CompanyModule,
   ],
   controllers: [AppController],
   providers: [
