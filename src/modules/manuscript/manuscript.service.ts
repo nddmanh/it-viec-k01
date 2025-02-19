@@ -6,6 +6,8 @@ import { Manuscript } from 'src/databases/entities/manuscript.entity';
 import { UpsertManuscriptDto } from './dto/upsert-manuscript.dto';
 import { ManuscriptSkill } from 'src/databases/entities/manuscript-skill.entity';
 import { DataSource } from 'typeorm';
+import { ManuscriptQueriesDto } from './dto/manuscript-queries.dto';
+import { convertKeySortManuscript } from 'src/commons/utils/helper';
 
 @Injectable()
 export class ManuscriptService {
@@ -83,6 +85,129 @@ export class ManuscriptService {
 
     return {
       message: 'Success',
+    };
+  }
+
+  async getAll(queries: ManuscriptQueriesDto) {
+    const {
+      page,
+      limit,
+      keyword,
+      companyAddress,
+      companyTypes,
+      levels,
+      workingModels,
+      industryIds,
+      maxSalary,
+      minSalary,
+      sort,
+    } = queries;
+
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.manuscriptRepository
+      .createQueryBuilder('manuscript')
+      .leftJoin('manuscript.company', 'c')
+      .leftJoin('manuscript.manuscriptSkills', 'm')
+      .leftJoin('m.skill', 's')
+      .select([
+        'manuscript.id AS "id"',
+        'manuscript.title AS "title"',
+        'manuscript.minSalary AS "minSalary"',
+        'manuscript.maxSalary AS "maxSalary"',
+        'manuscript.summary AS "summary"',
+        'manuscript.level AS "level"',
+        'manuscript.workingModel AS "workingModel"',
+        'manuscript.createdAt AS "createdAt"',
+        'c.id AS "companyId"',
+        'c.name AS "companyName"',
+        'c.location AS "companyAddress"',
+        'c.companySize AS "companySize"',
+        'c.companyType AS "companyType"',
+        'c.industry AS "companyIndustry"',
+        'c.logo AS "companyLogo"',
+        "JSON_AGG(json_build_object('id', s.id, 'name', s.name)) AS manuscriptSkills",
+      ])
+      .groupBy('manuscript.id, c.id');
+
+    if (companyAddress) {
+      queryBuilder.andWhere('c.location = :address', {
+        address: companyAddress,
+      });
+    }
+
+    if (companyTypes) {
+      queryBuilder.andWhere('c.companyType IN (:...types)', {
+        types: companyTypes,
+      });
+    }
+
+    if (levels) {
+      queryBuilder.andWhere('manuscript.level IN (:...levels)', {
+        levels: levels,
+      });
+    }
+
+    if (workingModels) {
+      queryBuilder.andWhere('manuscript.workingModel IN (:...workingModels)', {
+        workingModels: workingModels,
+      });
+    }
+
+    if (industryIds) {
+      queryBuilder.andWhere('c.industry IN (:...industryIds)', {
+        industryIds: industryIds,
+      });
+    }
+
+    if (minSalary && maxSalary) {
+      queryBuilder
+        .andWhere('manuscript.minSalary >= :minSalary', {
+          minSalary: minSalary,
+        })
+        .andWhere('manuscript.maxSalary <= :maxSalary', {
+          maxSalary: maxSalary,
+        });
+    }
+
+    if (keyword) {
+      queryBuilder
+        .andWhere('s.name ILIKE :keyword', {
+          keyword: `%${keyword}%`,
+        })
+        .orWhere('manuscript.title ILIKE :keyword', {
+          keyword: `%${keyword}%`,
+        })
+        .orWhere('manuscript.summary ILIKE :keyword', {
+          keyword: `%${keyword}%`,
+        })
+        .orWhere('c.name ILIKE :keyword', {
+          keyword: `%${keyword}%`,
+        });
+    }
+
+    if (sort) {
+      const order = convertKeySortManuscript(sort);
+      for (const key of Object.keys(order)) {
+        queryBuilder.addOrderBy(key, order[key]);
+      }
+    } else {
+      queryBuilder.addOrderBy('manuscript.createdAt', 'DESC')
+    }
+
+    queryBuilder.limit(limit).offset(skip);
+
+    const data = await queryBuilder.getRawMany();
+    const total = await queryBuilder.getCount();
+
+    return {
+      message: 'Get all manuscripts',
+      result: {
+        total,
+        page,
+        limit,
+        data,
+      },
     };
   }
 }
