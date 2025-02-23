@@ -17,6 +17,7 @@ import { CompanyModule } from './modules/company/company.module';
 import { ManuscriptModule } from './modules/manuscript/manuscript.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { BullModule } from '@nestjs/bullmq';
+import { ApplicationModule } from './modules/application/application.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { BullModule } from '@nestjs/bullmq';
     IndustryModule,
     CompanyModule,
     ManuscriptModule,
+    ApplicationModule,
     RedisModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
