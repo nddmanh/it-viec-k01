@@ -59,6 +59,9 @@ export class Company extends BaseEntity {
   @JoinColumn([{ name: 'industry_id', referencedColumnName: 'id' }])
   industry: Industry;
 
+  @Column('integer', { name: 'industry_id', nullable: true, unique: true })
+  industryId: number | null;
+
   @OneToOne(() => User, (users) => users.companies)
   @JoinColumn([{ name: 'user_id', referencedColumnName: 'id' }])
   user: User;

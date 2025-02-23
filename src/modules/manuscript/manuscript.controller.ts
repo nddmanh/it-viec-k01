@@ -50,4 +50,10 @@ export class ManuscriptController {
   getAll(@Query() queries: ManuscriptQueriesDto) {
     return this.manuscriptService.getAll(queries);
   }
+
+  @Public()
+  @Get(':id')
+  get(@Param('id') id: number) {
+    return this.manuscriptService.get(id);
+  }
 }

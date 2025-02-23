@@ -8,13 +8,17 @@ import { ManuscriptSkill } from 'src/databases/entities/manuscript-skill.entity'
 import { DataSource } from 'typeorm';
 import { ManuscriptQueriesDto } from './dto/manuscript-queries.dto';
 import { convertKeySortManuscript } from 'src/commons/utils/helper';
+import { ManuscriptSkillRepository } from 'src/databases/repositories/manuscript-skill.repository';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class ManuscriptService {
   constructor(
     private readonly manuscriptRepository: ManuscriptRepository,
+    private readonly manuscriptSkillRepository: ManuscriptSkillRepository,
     private readonly companyRepository: CompanyRepository,
     private readonly dataSource: DataSource,
+    private readonly redisService: RedisService,
   ) {}
 
   async create(body: UpsertManuscriptDto, user: User) {
@@ -59,9 +63,50 @@ export class ManuscriptService {
   }
 
   async update(id: number, body: UpsertManuscriptDto, user: User) {
+    const companyRec = await this.companyRepository.findOneBy({
+      userId: user.id,
+    });
+
+    const manuscriptRec = await this.manuscriptRepository.findOne({
+      where: {
+        id,
+      },
+    });
+
+    if (!manuscriptRec) {
+      throw new HttpException('Not found', HttpStatus.NOT_FOUND);
+    }
+    if (companyRec.id !== manuscriptRec.companyId) {
+      throw new HttpException('User FORBIDDEN', HttpStatus.FORBIDDEN);
+    }
+
+    const { skillIds } = body;
+    delete body.skillIds;
+
+    // Update Manuscript
+    const updatedManuscript = await this.manuscriptRepository.save({
+      ...manuscriptRec,
+      ...body,
+    });
+
+    // Update Manuscript skills
+    // Xóa đi những manuscript cũ
+    await this.manuscriptSkillRepository.delete({ manuscriptId: id });
+
+    // Tạo lại manuscript mới
+    const manuscriptSkills = skillIds.map((skillId) => ({
+      manuscriptId: manuscriptRec.id,
+      skillId,
+    }));
+
+    await this.manuscriptSkillRepository.save(manuscriptSkills);
+
+    // Xóa data trong redis vì dữ liệu bị thay đổi
+    await this.redisService.setKey('manu' + id, '');
+
     return {
       message: 'Update manuscript suuccessfully',
-      result: 'manuscriptUpdated',
+      result: updatedManuscript,
     };
   }
 
@@ -82,6 +127,8 @@ export class ManuscriptService {
     }
 
     await this.manuscriptRepository.softDelete(id);
+    // Xóa data trong redis vì dữ liệu bị thay đổi
+    await this.redisService.setKey('manu' + id, '');
 
     return {
       message: 'Success',
@@ -208,6 +255,51 @@ export class ManuscriptService {
         limit,
         data,
       },
+    };
+  }
+
+  async get(id) {
+    const manuKey = 'manu' + id;
+
+    // Step 1: get manuscriptRec từ redis
+    console.log('step 1');
+
+    const manuscript = await this.redisService.getKey(manuKey);
+    let manuscriptRec: Manuscript;
+
+    // Step 2: check manuscript redis is null
+    if (!manuscript) {
+      console.log('step 2');
+
+      // Step 3: nếu ko có
+      // Step 3.1: vào db lấy
+      manuscriptRec = await this.manuscriptRepository.findOne({
+        where: {
+          id,
+        },
+      });
+
+      console.log('step 3');
+
+      if (!manuscriptRec) {
+        throw new HttpException('Not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Step 3.2: nếu ko có thì vào db lấy
+      await this.redisService.setKey(manuKey, JSON.stringify(manuscriptRec));
+      console.log('step 3.2');
+    } else {
+      console.log('step 4');
+
+      manuscriptRec = JSON.parse(manuscript);
+    }
+
+    console.log('Done!');
+
+    // nếu có trong redis thì trả về
+    return {
+      message: 'get manuscript suuccessfully',
+      result: manuscriptRec,
     };
   }
 }
