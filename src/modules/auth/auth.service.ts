@@ -16,6 +16,8 @@ import { CompanyRepository } from 'src/databases/repositories/company.repository
 import { DataSource } from 'typeorm';
 import { Company } from 'src/databases/entities/company.entity';
 import { MailService } from '../mail/mail.service';
+import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +29,7 @@ export class AuthService {
     private readonly companyRepository: CompanyRepository,
     private readonly dataSource: DataSource,
     private readonly mailService: MailService,
+    @InjectQueue('mail-queue') private mailQueue: Queue,
   ) {}
 
   async registerUser(body: RegisterUserDto) {
@@ -55,16 +58,22 @@ export class AuthService {
       userId: newUser.id,
     });
 
-    // Send mail here
-    await this.mailService.sendMail(
-      email,
-      'Welcome to IT VIEC',
-      'welcome-applicant',
-      {
-        name: username,
-        email: email,
-      },
-    );
+    // // Send mail here
+    // await this.mailService.sendMail(
+    //   email,
+    //   'Welcome to IT VIEC',
+    //   'welcome-applicant',
+    //   {
+    //     name: username,
+    //     email: email,
+    //   },
+    // );
+
+    // add job cho producer
+    await this.mailQueue.add('send-mail-applicant', {
+      name: username,
+      email: email,
+    });
 
     return {
       message: 'Register user successfully',
@@ -114,17 +123,24 @@ export class AuthService {
 
       await queryRunnner.commitTransaction();
 
-      // Send mail here
-      await this.mailService.sendMail(
-        email,
-        'Welcome your company to IT VIEC',
-        'welcome-company',
-        {
-          name: username,
-          email: email,
-          company: companyName,
-        },
-      );
+      // // Send mail here
+      // await this.mailService.sendMail(
+      //   email,
+      //   'Welcome your company to IT VIEC',
+      //   'welcome-company',
+      //   {
+      //     name: username,
+      //     email: email,
+      //     company: companyName,
+      //   },
+      // );
+
+      // add job cho producer
+      await this.mailQueue.add('send-mail-company', {
+        name: username,
+        email: email,
+        company: companyName,
+      });
       return {
         message: 'Register user company successfully',
       };
