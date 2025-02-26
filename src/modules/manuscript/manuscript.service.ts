@@ -10,11 +10,14 @@ import { ManuscriptQueriesDto } from './dto/manuscript-queries.dto';
 import { convertKeySortManuscript } from 'src/commons/utils/helper';
 import { ManuscriptSkillRepository } from 'src/databases/repositories/manuscript-skill.repository';
 import { RedisService } from '../redis/redis.service';
+import { ManuscriptViewRepository } from 'src/databases/repositories/manuscript-view.repository';
+import { CommonQueryDto } from 'src/commons/dtos/common-query.dto';
 
 @Injectable()
 export class ManuscriptService {
   constructor(
     private readonly manuscriptRepository: ManuscriptRepository,
+    private readonly manuscriptViewRepository: ManuscriptViewRepository,
     private readonly manuscriptSkillRepository: ManuscriptSkillRepository,
     private readonly companyRepository: CompanyRepository,
     private readonly dataSource: DataSource,
@@ -258,48 +261,122 @@ export class ManuscriptService {
     };
   }
 
-  async get(id) {
-    const manuKey = 'manu' + id;
+  // async get(id) {
+  //   const manuKey = 'manu' + id;
 
-    // Step 1: get manuscriptRec từ redis
-    console.log('step 1');
+  //   // Step 1: get manuscriptRec từ redis
+  //   console.log('step 1');
 
-    const manuscript = await this.redisService.getKey(manuKey);
-    let manuscriptRec: Manuscript;
+  //   const manuscript = await this.redisService.getKey(manuKey);
+  //   let manuscriptRec: Manuscript;
 
-    // Step 2: check manuscript redis is null
-    if (!manuscript) {
-      console.log('step 2');
+  //   // Step 2: check manuscript redis is null
+  //   if (!manuscript) {
+  //     console.log('step 2');
 
-      // Step 3: nếu ko có
-      // Step 3.1: vào db lấy
-      manuscriptRec = await this.manuscriptRepository.findOne({
+  //     // Step 3: nếu ko có
+  //     // Step 3.1: vào db lấy
+  //     manuscriptRec = await this.manuscriptRepository.findOne({
+  //       where: {
+  //         id,
+  //       },
+  //     });
+
+  //     console.log('step 3');
+
+  //     if (!manuscriptRec) {
+  //       throw new HttpException('Not found', HttpStatus.NOT_FOUND);
+  //     }
+
+  //     // Step 3.2: nếu ko có thì vào db lấy
+  //     await this.redisService.setKey(manuKey, JSON.stringify(manuscriptRec));
+  //     console.log('step 3.2');
+  //   } else {
+  //     console.log('step 4');
+
+  //     manuscriptRec = JSON.parse(manuscript);
+  //   }
+
+  //   console.log('Done!');
+
+  //   // nếu có trong redis thì trả về
+  //   return {
+  //     message: 'get manuscript suuccessfully',
+  //     result: manuscriptRec,
+  //   };
+  // }
+
+  async get(id: number, user: User) {
+    const manuscriptRec = await this.manuscriptRepository.findOne({
+      where: {
+        id,
+      },
+    });
+
+    if (!manuscriptRec) {
+      throw new HttpException('Not found', HttpStatus.NOT_FOUND);
+    }
+
+    // nếu có user thì thực hiện save recent viewed job
+    if (user) {
+      const manuscriptViewRec = await this.manuscriptViewRepository.findOne({
         where: {
-          id,
+          userId: user.id,
+          manuscriptId: id,
         },
       });
 
-      console.log('step 3');
-
-      if (!manuscriptRec) {
-        throw new HttpException('Not found', HttpStatus.NOT_FOUND);
+      if (manuscriptViewRec) {
+        // nếu có rồi thì update thời gian xem
+        await this.manuscriptViewRepository.save({
+          ...manuscriptViewRec,
+          updatedAt: new Date(),
+        });
+      } else {
+        // nếu chưa có thì tạo ra bản ghi mới
+        await this.manuscriptViewRepository.save({
+          userId: user.id,
+          manuscriptId: id,
+        });
       }
-
-      // Step 3.2: nếu ko có thì vào db lấy
-      await this.redisService.setKey(manuKey, JSON.stringify(manuscriptRec));
-      console.log('step 3.2');
-    } else {
-      console.log('step 4');
-
-      manuscriptRec = JSON.parse(manuscript);
     }
 
-    console.log('Done!');
-
-    // nếu có trong redis thì trả về
     return {
       message: 'get manuscript suuccessfully',
       result: manuscriptRec,
+    };
+  }
+
+  async getAllByViewed(queries: CommonQueryDto, user: User) {
+    const { page, limit } = queries;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.manuscriptRepository.findAndCount({
+      where: {
+        manuscriptViews: {
+          userId: user.id,
+        },
+      },
+      skip,
+      take: limit,
+      relations: ['manuscriptViews'],
+      order: {
+        manuscriptViews: {
+          updatedAt: 'DESC',
+        },
+      },
+    });
+
+    return {
+      message: 'get recent manuscripts suuccessfully',
+      result: {
+        data,
+        metadata: {
+          total,
+          page,
+          limit,
+        },
+      },
     };
   }
 }
