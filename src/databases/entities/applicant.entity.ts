@@ -24,6 +24,9 @@ export class Applicant extends BaseEntity {
   @Column('integer', { name: 'user_id', nullable: true, unique: true })
   userId: number | null;
 
+  @Column('character varying', { name: 'avatar', nullable: true })
+  avatar: string | null;
+
   @Column('character varying', { name: 'first_name', nullable: true })
   firstName: string | null;
 
