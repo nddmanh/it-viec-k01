@@ -4,11 +4,15 @@ import { CompanyRepository } from 'src/databases/repositories/company.repository
 import { User } from 'src/databases/entities/user.entity';
 import { StorageService } from '../storage/storage.service';
 import { IndustryRepository } from 'src/databases/repositories/industry.repository';
+import { ReviewCompanyDto } from './dto/review-company.dto';
+import { CompanyReviewRepository } from 'src/databases/repositories/company-review.repository';
+import { CompanyReviewQueryDto } from './dto/company-review-query.dto';
 
 @Injectable()
 export class CompanyService {
   constructor(
     private readonly companyRepository: CompanyRepository,
+    private readonly companyReviewRepository: CompanyReviewRepository,
     private readonly industryRepository: IndustryRepository,
     private readonly storageService: StorageService,
   ) {}
@@ -59,6 +63,57 @@ export class CompanyService {
     return {
       message: 'Update company suuccessfully',
       result: companyUpdated,
+    };
+  }
+
+  async createReview(body: ReviewCompanyDto, user: User) {
+    const companyReview = await this.companyReviewRepository.save({
+      ...body,
+      userId: user.id,
+    });
+
+    return {
+      message: 'Review company suuccessfully',
+      result: companyReview,
+    };
+  }
+
+  async getReview(companyId: number, queries: CompanyReviewQueryDto) {
+    const { limit, cursor } = queries;
+
+    const total = await this.companyReviewRepository.count({
+      where: { companyId },
+    });
+
+    const queryBuilder = await this.companyReviewRepository
+      .createQueryBuilder('review')
+      .where('review.companyId = :companyId', { companyId })
+      .orderBy('review.createdAt', 'DESC')
+      .take(limit + 1);
+
+    if (cursor) {
+      queryBuilder.andWhere('review.id < :cursor', { cursor });
+    }
+
+    const results = await queryBuilder.getMany();
+
+    let next = null;
+    const hasNextPage = results.length > limit;
+    if (hasNextPage) {
+      results.pop();
+      next = results[results.length - 1].id;
+    }
+
+    return {
+      message: 'Get reviews company suuccessfully',
+      result: {
+        data: results,
+        pagination: {
+          limit,
+          next,
+          total,
+        },
+      },
     };
   }
 }
