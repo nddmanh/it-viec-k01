@@ -27,15 +27,11 @@ export class AuthGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (isPublic) {
-      return true;
-    }
-
     // Check xem user có thuộc hệ thống không
     const request = context.switchToHttp().getRequest();
 
     const token = this.extractTokenFromHeader(request);
-    if (!token) {
+    if (!token && !isPublic) {
       throw new UnauthorizedException();
     }
 
@@ -46,7 +42,13 @@ export class AuthGuard implements CanActivate {
 
       request['user'] = payload;
     } catch {
-      throw new UnauthorizedException();
+      if (!isPublic) {
+        throw new UnauthorizedException();
+      }
+    }
+
+    if (isPublic) {
+      return true;
     }
 
     // Check role user

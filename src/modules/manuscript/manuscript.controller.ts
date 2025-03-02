@@ -17,6 +17,7 @@ import { GetCurrentUser } from 'src/commons/decorators/get-current-user.decorato
 import { User } from 'src/databases/entities/user.entity';
 import { UpsertManuscriptDto } from './dto/upsert-manuscript.dto';
 import { ManuscriptQueriesDto } from './dto/manuscript-queries.dto';
+import { CommonQueryDto } from 'src/commons/dtos/common-query.dto';
 
 @ApiBearerAuth()
 @Controller('manuscript')
@@ -51,9 +52,18 @@ export class ManuscriptController {
     return this.manuscriptService.getAll(queries);
   }
 
+  @Roles(ROLE.APPLICANT)
+  @Get('viewed')
+  getAllByViewed(
+    @Query() queries: CommonQueryDto,
+    @GetCurrentUser() user: User,
+  ) {
+    return this.manuscriptService.getAllByViewed(queries, user);
+  }
+
   @Public()
   @Get(':id')
-  get(@Param('id') id: number) {
-    return this.manuscriptService.get(id);
+  get(@Param('id') id: number, @GetCurrentUser() user: User) {
+    return this.manuscriptService.get(id, user);
   }
 }
