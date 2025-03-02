@@ -61,9 +61,28 @@ export class ManuscriptController {
     return this.manuscriptService.getAllByViewed(queries, user);
   }
 
+  @Roles(ROLE.APPLICANT)
+  @Get('favorite')
+  getAllByFavorite(
+    @Query() queries: CommonQueryDto,
+    @GetCurrentUser() user: User,
+  ) {
+    console.log('call to api get favourite');
+
+    return this.manuscriptService.getAllByFavorite(queries, user);
+  }
+
   @Public()
   @Get(':id')
   get(@Param('id') id: number, @GetCurrentUser() user: User) {
+    console.log('call to api get detail');
+
     return this.manuscriptService.get(id, user);
+  }
+
+  @Roles(ROLE.APPLICANT)
+  @Post('favorite/:id')
+  favorite(@Param('id') id: number, @GetCurrentUser() user: User) { 
+    return this.manuscriptService.favorite(id, user);
   }
 }
